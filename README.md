@@ -10,7 +10,8 @@ Available on Linux or OS X platforms.
 First, clone this git repo:
 
 ```bash
-$ git clone ...
+$ git clone git@github.com:josehu07/volume-peak-counter.git
+$ cd volume-peak-counter/
 ```
 
 Then, prepare the prerequisites:
