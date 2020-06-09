@@ -16,7 +16,7 @@ $ git clone ...
 Then, prepare the prerequisites:
 
 1. `loudness-scanner` is a git submodule by `jiixyj` ([repo](https://github.com/jiixyj/loudness-scanner)) and should be pulled automatically. Follow its installation guide to build a `loudness` binary at `loudness-scaner/build/loudness`. Please make sure one of its input plugins is working.
-2. `gnuplot_i` ...
+2. `gnuplot_i` is a gnuplot interface by Devillard ([page](http://ndevilla.free.fr/gnuplot/gnuplot_i/)). This projects contains a slightly modified version of `gnuplot_i` which adds an `options` argument to `gnuplot_plot_xy`. Type `make` under `gnuplot_i/` folder and make sure that `gnuplot_i/gnuplot_i.o` is correctly produced.
 
 Finally, build the counter by:
 

@@ -67,7 +67,8 @@ char const * gnuplot_tmpfile(gnuplot_ctrl * handle);
  * @param tmp_filename
  * @param title
  */
-void gnuplot_plot_atmpfile(gnuplot_ctrl * handle, char const* tmp_filename, char const* title);
+void gnuplot_plot_atmpfile(gnuplot_ctrl * handle, char const* tmp_filename, char const* title,
+                           const char *options);
 
 /*---------------------------------------------------------------------------
                             Function codes
@@ -332,7 +333,8 @@ void gnuplot_plot_x(
     gnuplot_ctrl    *   handle,
     double          *   d,
     int                 n,
-    char            *   title
+    char            *   title,
+    const char      *   options
 )
 {
     int     i ;
@@ -356,7 +358,7 @@ void gnuplot_plot_x(
     }
     fclose(tmpfd) ;
 
-    gnuplot_plot_atmpfile(handle,tmpfname,title);
+    gnuplot_plot_atmpfile(handle,tmpfname,title,options);
     return ;
 }
 
@@ -399,7 +401,8 @@ void gnuplot_plot_xy(
     double          *   x,
     double          *   y,
     int                 n,
-    char            *   title
+    char            *   title,
+    const char      *   options
 )
 {
     int     i ;
@@ -423,7 +426,7 @@ void gnuplot_plot_xy(
     }
     fclose(tmpfd) ;
 
-    gnuplot_plot_atmpfile(handle,tmpfname,title);
+    gnuplot_plot_atmpfile(handle,tmpfname,title,options);
     return ;
 }
 
@@ -481,9 +484,9 @@ void gnuplot_plot_once(
       gnuplot_set_ylabel(handle, "Y");
   }
   if (y==NULL) {
-      gnuplot_plot_x(handle, x, n, title);
+      gnuplot_plot_x(handle, x, n, title, "");
   } else {
-      gnuplot_plot_xy(handle, x, y, n, title);
+      gnuplot_plot_xy(handle, x, y, n, title, "");
   }
   printf("press ENTER to continue\n");
   while (getchar()!='\n') {}
@@ -702,12 +705,13 @@ char const * gnuplot_tmpfile(gnuplot_ctrl * handle)
     return tmp_filename;
 }
 
-void gnuplot_plot_atmpfile(gnuplot_ctrl * handle, char const* tmp_filename, char const* title)
+void gnuplot_plot_atmpfile(gnuplot_ctrl * handle, char const* tmp_filename, char const* title,
+                           const char *options)
 {
     char const *    cmd    = (handle->nplots > 0) ? "replot" : "plot";
     title                  = (title == NULL)      ? "(none)" : title;
-    gnuplot_cmd(handle, "%s \"%s\" title \"%s\" with %s", cmd, tmp_filename,
-                  title, handle->pstyle) ;
+    gnuplot_cmd(handle, "%s \"%s\" title \"%s\" with %s %s", cmd, tmp_filename,
+                  title, handle->pstyle, options) ;
     handle->nplots++ ;
     return ;
 }

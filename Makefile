@@ -12,9 +12,17 @@ all:
 	@echo "  make counter-rs"
 	@echo "  make counter-go"
 
-counter-c: $(SRC_C)/counter.c
-	gcc $< -o $(TARGET) -O2 -std=c99
+ring-buf.o: $(SRC_C)/ring-buf.c $(SRC_C)/ring-buf.h
+	gcc $< -c -o $@ -O2 -std=c99
+
+counter-c: $(SRC_C)/counter.c ring-buf.o gnuplot_i/gnuplot_i.o
+	@if [ ! -e "loudness-scanner/build/loudness" ]; then 				\
+		@echo "ERROR: 'loudness-scanner' is not correctly prepared."; 	\
+	elif [ ! -e "gnuplot_i/gnuplot_i.o" ]; then 						\
+		@echo "ERROR: 'gnuplot_i' is not correctly prepared."; 			\
+	fi;
+	gcc $^ -o $(TARGET) -O2 -std=c99
 
 .PHONY: clean
 clean:
-	rm -f counter
+	rm -f *.o $(TARGET) gnuplot_tmpdata*
