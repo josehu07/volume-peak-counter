@@ -5,8 +5,8 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#include "../gnuplot_i/src/gnuplot_i.h"
 #include "ring-buf.h"
+#include "gnuplot_i.h"
 
 
 #define SCANNER "./loudness-scanner/build/loudness"
@@ -15,7 +15,7 @@
 #define WINDOW_SIZE (128)
 #define SLEEP_LENGTH (0.1)  // Sleep only 0.1 sec for every 0.5 secs of music.
 
-#define YRANGE_LOW (-20)
+#define YRANGE_LOW (-18)
 #define YRANGE_HIGH (-2)
 #define THRESHOLD (-7.0)
 
@@ -57,29 +57,38 @@ plot_volume_curve(gnuplot_ctrl *h, char *mp3_file,
     gnuplot_cmd(h, "set xrange [%lf:%lf]", xs_low, xs_high);
     gnuplot_cmd(h, "set yrange [%d:%d]", YRANGE_LOW, YRANGE_HIGH);
 
-    // Volume line (smoothed).
-    gnuplot_plot_xy(h, xs, ys, count, mp3_file,
-                    "smooth acsplines lt rgb 'dark-blue' lw 2");
-
     // Threshold line.
-    gnuplot_cmd(h, "set arrow from %f,%f to %f,%f nohead %s",
-                xs_low, THRESHOLD, xs_high, THRESHOLD,
+    gnuplot_cmd(h, "set arrow from %f,%f to %f,%f nohead %s",   // Horizontal.
+                xs_low, THRESHOLD,
+                xs_high, THRESHOLD,
                 "lt rgb 'dark-red' lw 1");
+
+    // Latest peak indicator.
+    if (latest_peak_timestamp >= xs_low && latest_peak_timestamp <= xs_high
+        && latest_peak_timestamp > 0) {
+        gnuplot_cmd(h, "set arrow from %f,%f to %f,%f %s",  // Vertical.
+                    latest_peak_timestamp, YRANGE_LOW,
+                    latest_peak_timestamp, THRESHOLD,
+                    "lt rgb 'red' lw 2");
+    }
 
     // Customized text.
     char latest_peak_text[16];
     if (peak_count > 0) {
         snprintf(latest_peak_text, 16, "%.1fs", latest_peak_timestamp);
-        // gnuplot_cmd(h, "set arrow from %f,%f to %f,%f %s",  // Vertical.
-        //             latest_peak_timestamp, YRANGE_LOW,
-        //             latest_peak_timestamp, THRESHOLD,
-        //             "lt rgb 'red' lw 2");
     } else
-        snprintf(latest_peak_text, 16, "none");
+        snprintf(latest_peak_text, 16, "(none)");
     gnuplot_cmd(h, "unset label");
-    gnuplot_cmd(h, "set label '# Peaks: %-3d; Latest: %s' left %s",
+    gnuplot_cmd(h, "set label \"|  Speed: %3dx  |  Thresh: %5.1f LUFS  |\\n"
+                               "|  #Peaks: %3d  |  Latest \\\\@ %10s  |\""
+                               "left %s",
+                (int) (INTERVAL / SLEEP_LENGTH), THRESHOLD,
                 peak_count, latest_peak_text,
-                "at graph 0.05,0.9 font 'Verdana,18'");
+                "at graph 0.05,0.92 font 'Verdana,18'");
+
+    // Volume line (smoothed).
+    gnuplot_plot_xy(h, xs, ys, count, mp3_file,
+                    "smooth acsplines lt rgb 'dark-blue' lw 2");
 
     usleep((int) (SLEEP_LENGTH * 1e6));     // Sleep to give proper animation.
 }
@@ -125,6 +134,7 @@ curve_parser(gnuplot_ctrl *h, char *mp3_file, const int pipefd[]) {
     RingBuf *timestamp_window = ring_buf_new(WINDOW_SIZE);
 
     // Read scanner results and get loudness float values.
+    printf(" Peak#  Timestamp\n");
     while (read(pipefd[0], &c, sizeof(c)) != 0) {
         // On newline.
         if (c == '\n' || c == '\r') {
@@ -139,6 +149,7 @@ curve_parser(gnuplot_ctrl *h, char *mp3_file, const int pipefd[]) {
                     } else if (in_peak) {
                         peak_count++;
                         latest_peak_timestamp = timestamp;
+                        printf("   %3d     %5.1fs\n", peak_count, timestamp);
                         in_peak = false;
                     }
 
@@ -171,17 +182,14 @@ int
 main(void) {
     gnuplot_ctrl *h = gnuplot_init();   // Maintain a persistent session.
 
-    char *mp3_file = "test-songs/棱镜-摇晃.mp3";    // Hardcoded for now.
+    char *mp3_file = "test-songs/test-music.mp3";    // Hardcoded for now.
 
-    pid_t pid;
     int pipefd[2];
-
     pipe(pipefd);
 
-    pid = fork();
-    if (pid == 0)   // Child process.
+    if (fork() == 0)    // Child process.
         exec_scanner(mp3_file, pipefd);
-    else            // Parent process.
+    else                // Parent process.
         curve_parser(h, mp3_file, pipefd);
 
     gnuplot_close(h);

@@ -34,6 +34,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <assert.h>
+#include <unistd.h>
 
 #ifdef WIN32
 #include <io.h>
