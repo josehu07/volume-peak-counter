@@ -20,7 +20,7 @@ endef
 
 # C version.
 CC=gcc
-CFLAGS=-O2 -std=c99 -g
+CFLAGS=-O2 -std=c99
 
 ring-buf.o: src-c/ring-buf.c src-c/ring-buf.h
 	$(CC) $(CFLAGS) $< -c -o $@

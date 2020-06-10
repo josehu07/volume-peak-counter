@@ -54,37 +54,40 @@ plot_volume_curve(gnuplot_ctrl *h, char *mp3_file,
         xs_low = xs[0];
         xs_high = xs[count - 1];
     }
-    gnuplot_cmd(h, "set xrange [%lf:%lf]", xs_low, xs_high);
+    gnuplot_cmd(h, "set xrange [%.1lf:%.1lf]", xs_low, xs_high);
     gnuplot_cmd(h, "set yrange [%d:%d]", YRANGE_LOW, YRANGE_HIGH);
 
-    // Threshold line.
-    gnuplot_cmd(h, "set arrow from %f,%f to %f,%f nohead %s",   // Horizontal.
+    // Threshold line (horizontal).
+    gnuplot_cmd(h, "set arrow 1 from %.1f,%.1f to %.1f,%.1f nohead %s",
                 xs_low, THRESHOLD,
                 xs_high, THRESHOLD,
                 "lt rgb 'dark-red' lw 1");
 
-    // Latest peak indicator.
-    if (latest_peak_timestamp >= xs_low && latest_peak_timestamp <= xs_high
-        && latest_peak_timestamp > 0) {
-        gnuplot_cmd(h, "set arrow from %f,%f to %f,%f %s",  // Vertical.
-                    latest_peak_timestamp, YRANGE_LOW,
-                    latest_peak_timestamp, THRESHOLD,
-                    "lt rgb 'red' lw 2");
+    // Latest peak indicator (vertical).
+    if (peak_count > 0) {
+        if (latest_peak_timestamp >= xs_low
+            && latest_peak_timestamp <= xs_high)
+            gnuplot_cmd(h, "set arrow 2 from %.1f,%d to %.1f,%.1f %s",
+                        latest_peak_timestamp, YRANGE_LOW,
+                        latest_peak_timestamp, THRESHOLD,
+                        "lt rgb 'red' lw 2");
+        else if (latest_peak_timestamp < xs_low)
+            gnuplot_cmd(h, "unset arrow 2");
     }
 
     // Customized text.
     char latest_peak_text[16];
-    if (peak_count > 0) {
+    if (peak_count > 0)
         snprintf(latest_peak_text, 16, "%.1fs", latest_peak_timestamp);
-    } else
+    else
         snprintf(latest_peak_text, 16, "(none)");
-    gnuplot_cmd(h, "unset label");
-    gnuplot_cmd(h, "set label \"|  Speed: %3dx  |  Thresh: %5.1f LUFS  |\\n"
-                               "|  #Peaks: %3d  |  Latest \\\\@ %10s  |\""
-                               "left %s",
+    gnuplot_cmd(h, "set label 1 \"| Speed: %3dx | Thresh: %5.1f LUFS |\\n"
+                                 "|-           -|-                  -|\\n"
+                                 "| #Peaks: %3d | Latest \\\\@ %9s |\""
+                                 "left %s",
                 (int) (INTERVAL / SLEEP_LENGTH), THRESHOLD,
                 peak_count, latest_peak_text,
-                "at graph 0.05,0.92 font 'Verdana,18'");
+                "at graph 0.03,0.92 font 'Courier,18'");
 
     // Volume line (smoothed).
     gnuplot_plot_xy(h, xs, ys, count, mp3_file,
@@ -133,8 +136,11 @@ curve_parser(gnuplot_ctrl *h, char *mp3_file, const int pipefd[]) {
     RingBuf *volume_window = ring_buf_new(WINDOW_SIZE);
     RingBuf *timestamp_window = ring_buf_new(WINDOW_SIZE);
 
-    // Read scanner results and get loudness float values.
+    // Read scanner results and get loudness float values. A peak is defined
+    // as volume exceeds the threshold and then goes down the threshold. A
+    // peak is timestamped at when it exceeds the threshold line.
     printf(" Peak#  Timestamp\n");
+
     while (read(pipefd[0], &c, sizeof(c)) != 0) {
         // On newline.
         if (c == '\n' || c == '\r') {
@@ -144,12 +150,12 @@ curve_parser(gnuplot_ctrl *h, char *mp3_file, const int pipefd[]) {
                 float volume = strtof(pipe_buf, &end_ptr);
 
                 if (end_ptr != NULL && end_ptr > pipe_buf) {
-                    if (volume > THRESHOLD && !in_peak) {
+                    if (volume >= THRESHOLD && !in_peak) {
                         in_peak = true;
-                    } else if (in_peak) {
                         peak_count++;
                         latest_peak_timestamp = timestamp;
                         printf("   %3d     %5.1fs\n", peak_count, timestamp);
+                    } else if (volume < THRESHOLD && in_peak) {
                         in_peak = false;
                     }
 
@@ -172,6 +178,8 @@ curve_parser(gnuplot_ctrl *h, char *mp3_file, const int pipefd[]) {
         }
     }
 
+    printf(" Total #Peaks: %3d\n", peak_count);
+
     ring_buf_del(volume_window);
     ring_buf_del(timestamp_window);
 }
@@ -179,11 +187,23 @@ curve_parser(gnuplot_ctrl *h, char *mp3_file, const int pipefd[]) {
 
 /** Main entrance. */
 int
-main(void) {
+main(int argc, char *argv[]) {
     gnuplot_ctrl *h = gnuplot_init();   // Maintain a persistent session.
 
-    char *mp3_file = "test-songs/test-music.mp3";    // Hardcoded for now.
+    // Read in music file path.
+    if (argc != 2) {
+        printf("ERROR: please specify the MP3 music file.\n");
+        printf("USAGE: ./counter MUSIC.mp3 2> /dev/null\n");
+        return 1;
+    }
+    char *mp3_file = argv[1];
 
+    if (access(mp3_file, R_OK) == -1) {
+        printf("ERROR: music file '%s' does not exist.\n", mp3_file);
+        return 1;
+    }
+
+    // Fork a scanner process.
     int pipefd[2];
     pipe(pipefd);
 
