@@ -14,7 +14,7 @@ define check_loudness
 	@if [ ! -e "loudness-scanner/build/loudness" ]; then 				\
 		@echo "ERROR: 'loudness-scanner' is not correctly prepared."; 	\
 		exit 1; 														\
-	fi;
+	fi
 endef
 
 
@@ -35,7 +35,8 @@ counter-c: src-c/counter.c ring-buf.o gnuplot_i.o
 
 # Rust version.
 counter-rs:
-	@echo "NOT IMPLEMENTED!"
+	$(check_loudness)
+	$(MAKE) -C src-rs all
 
 
 # Go version.
